@@ -87,6 +87,8 @@ int main(int argc, char* argv[]) {
     int rows_per_thread = rows / num_threads;
     int remaining_rows = rows % num_threads;
 
+    clock_t start = clock();
+
     // Create threads
     for (int i = 0; i < num_threads; i++) {
         thread_data[i].start_row = i * rows_per_thread;
@@ -102,11 +104,15 @@ int main(int argc, char* argv[]) {
         pthread_join(threads[i], NULL);
     }
 
+    clock_t end = clock();
+
     // Print results
     printf("Total Sum: %lld\n", total_sum);
     printf("Min Element: %d\n", min_element);
     printf("Max Element: %d\n", max_element);
-
+    double time_taken = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Threads execution time: %.2f seconds\n", time_taken);
+    /*
     for(int i = 0; i < rows; i++) {
         printf("Row %d Sum: %d\n", i, row_sums[i]);
     }
@@ -117,6 +123,7 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < rows; i++) {
         free(matrix[i]);
     }
+    */
     free(matrix);
     free(row_sums);
     free(col_sums);
