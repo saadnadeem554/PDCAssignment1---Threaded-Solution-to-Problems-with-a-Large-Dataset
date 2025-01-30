@@ -1,42 +1,45 @@
 import h5py
 import numpy as np
-import gc
 
 # Input and output file paths
 input_file_path = 'matrix.h5'
-output_file_path = 'extracted_matrix_1GB.txt'
+output_file_path = 'extracted_matrix_1.5GB.txt'
 
-# Determine the size of each element (assuming int32)
-element_size = 4  # Size of int32 in bytes (change to 4 for int32, or 8 for int64)
+# Define constants
+element_size = 4  # Size of int32 in bytes
+target_size_bytes = 1.5 * 1024 * 1024 * 1024  # 1.5 GB in bytes
+num_elements_to_extract = int(target_size_bytes / element_size)  # Total elements to extract
 
-# Calculate how many elements to load for ~100 MB (reduce chunk size further)
-# 100MB = 104857600 bytes, so this will load 100MB of data at a time instead of 1GB
-num_elements_to_load = 104857600 // element_size
-
+# Calculate number of rows to extract (ensuring it does not exceed the total rows available)
 # Open the HDF5 file
 with h5py.File(input_file_path, 'r') as f:
     # Extract the 'block0_values' dataset (the matrix)
     matrix = f['t/block0_values']
+    total_rows, total_columns = matrix.shape
     
-    # Get the total number of elements (rows * columns) in the matrix
-    total_elements = matrix.shape[0] * matrix.shape[1]
-    
+    rows_to_extract = min(num_elements_to_extract // total_columns, total_rows)
+
     # Open the output file for writing
     with open(output_file_path, 'w') as f_out:
-        for start_row in range(0, matrix.shape[0], num_elements_to_load // matrix.shape[1]):
-            # Load the next chunk of the matrix
-            end_row = min(start_row + (num_elements_to_load // matrix.shape[1]), matrix.shape[0])
-            partial_matrix = matrix[start_row:end_row, :]
-            
-            # Convert NaN values to 0 and cast the matrix to integers
-            partial_matrix = np.nan_to_num(partial_matrix, nan=0)  # Replace NaNs with 0
-            partial_matrix = partial_matrix.astype(np.int32)  # Cast to integers (int32)
-            
-            # Save the partial matrix to the output file
-            np.savetxt(f_out, partial_matrix, fmt='%d')  # Save as integers
-            
-            # Free memory and run garbage collection to avoid memory overload
-            del partial_matrix
-            gc.collect()
-    
-    print(f"Extracted data saved to {output_file_path}.")
+        rows_extracted = 0
+        
+        # Process in chunks of rows
+        chunk_size = 500  # Process 500 rows at a time (you can adjust this based on memory)
+        while rows_extracted < rows_to_extract:
+            # Determine how many rows to read in the current chunk
+            remaining_rows = rows_to_extract - rows_extracted
+            chunk_rows = min(chunk_size, remaining_rows)
+
+            # Extract the chunk of rows
+            partial_matrix = matrix[rows_extracted:rows_extracted + chunk_rows, :]
+
+            # Convert NaNs to 0 and cast to int32
+            partial_matrix = np.nan_to_num(partial_matrix, nan=0).astype(np.int32)
+
+            # Save the chunk to file
+            np.savetxt(f_out, partial_matrix, fmt='%d')
+
+            # Update the number of rows extracted
+            rows_extracted += chunk_rows
+
+print(f"Extracted {rows_extracted} rows (~1.5 GB) saved to {output_file_path}.")
