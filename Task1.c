@@ -67,7 +67,7 @@ void update_top_nodes_array(int node, int degree) {
     pthread_mutex_unlock(&top_nodes_lock);
 }
 
-// Update node degree
+// Update node degrees
 void update_node_degree(int node) {
     int hash_index = hash_function(node);
     pthread_mutex_lock(&hash_locks[hash_index]);
@@ -100,10 +100,9 @@ void increment_edge_count() {
     pthread_mutex_unlock(&total_edge_lock);
 }
 
-// Print top nodes
+// Print top 10 nodes
 void print_top_nodes() {
     pthread_mutex_lock(&top_nodes_lock);
-
     printf("Top %d nodes with highest degrees:\n", TOP_NODES);
     for (int i = 0; i < TOP_NODES - 1; i++) {
         for (int j = i + 1; j < TOP_NODES; j++) {
@@ -120,7 +119,6 @@ void print_top_nodes() {
             printf("Node: %d, Degree: %d\n", top_nodes[i].node, top_nodes[i].degree);
         }
     }
-
     pthread_mutex_unlock(&top_nodes_lock);
 }
 
@@ -152,7 +150,7 @@ void set_thread_affinity(pthread_t thread, int core_id) {
     }
 }
 
-// Process lines
+// Thread function to Process lines in the file
 void *process_lines(void *arg) {
     char **args = (char **)arg;
     char *filename = args[0];
@@ -182,9 +180,9 @@ void *process_lines(void *arg) {
         if (line[0] != '#') {
             int from, to;
             if (sscanf(line, "%d %d", &from, &to) == 2) {
-                increment_edge_count();
-                update_node_degree(from);
-                update_node_degree(to);
+                increment_edge_count(); // Increment edge count
+                update_node_degree(from); // Update node degree
+                update_node_degree(to); // Update node degree
             }
         }
         line_number++;
@@ -207,7 +205,7 @@ void count_total_nodes() {
 }
 int main(int argc, char *argv[]) {
     if (argc < 4) {
-        fprintf(stderr, "Usage: %s <filename> <thread_count> <with_affinity>\n", argv[0]);
+        fprintf(stderr, "arguments: %s <filename> <thread_count> <with_affinity>\n", argv[0]);
         return 1;
     }
 
@@ -221,6 +219,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // count total lines
     long total_lines = 0;
     char line[MAX_LINE_LENGTH];
     while (fgets(line, MAX_LINE_LENGTH, file)) {
@@ -228,17 +227,16 @@ int main(int argc, char *argv[]) {
     }
     fclose(file);
 
+    // distribute lines to threads
     long lines_per_thread = total_lines / thread_count;
     pthread_t threads[thread_count];
 
     struct timespec start_time, end_time;
     clock_gettime(CLOCK_MONOTONIC, &start_time);
 
-
     for (int i = 0; i < thread_count; i++) {
         long start_line = i * lines_per_thread;
         long end_line = (i == thread_count - 1) ? total_lines : (i + 1) * lines_per_thread;
-
         char **args = malloc(4 * sizeof(char *));
         args[0] = filename;
         args[1] = malloc(20);

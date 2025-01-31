@@ -12,11 +12,11 @@ int *col_sums;
 long long total_sum = 0;
 int min_element = INT_MAX;
 int max_element = INT_MIN;
-
 int rows, cols;
 int num_threads;
 int use_affinity;
 
+// mutex for critical section
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
@@ -27,6 +27,7 @@ typedef struct {
     int *local_col_sums;
 } ThreadData;
 
+// compute function for each thread
 void* compute(void* arg) {
     ThreadData* data = (ThreadData*)arg;
     long long local_sum = 0;
@@ -39,9 +40,9 @@ void* compute(void* arg) {
     int core_id = data->thread_id % 4;
     CPU_SET(core_id, &cpuset);
     pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
-    //printf("Thread %d bound to core %d\n", data->thread_id, core_id);
 }
 
+    // compute local sum, min, max, row sums, and column sums
     for (int i = data->start_row; i < data->end_row; i++) {
         for (int j = 0; j < cols; j++) {
             local_sum += matrix[i][j];
@@ -52,6 +53,7 @@ void* compute(void* arg) {
         }
     }
 
+    // update global sum, min, max
     pthread_mutex_lock(&mutex);
     total_sum += local_sum;
     if (local_min < min_element) min_element = local_min;
@@ -63,7 +65,7 @@ void* compute(void* arg) {
 
 int main(int argc, char* argv[]) {
     if (argc != 6) {
-        printf("Usage: %s <matrix_file> <rows> <cols> <threads> <affinity (0/1)>\n", argv[0]);
+        printf("Arguments: %s <matrix_file> <rows> <cols> <threads> <affinity (0/1)>\n", argv[0]);
         return 1;
     }
 
@@ -73,6 +75,7 @@ int main(int argc, char* argv[]) {
     num_threads = atoi(argv[4]);
     use_affinity = atoi(argv[5]);
 
+    // allocate memory for matrix, row sums, and column sums
     matrix = (int**)malloc(rows * sizeof(int*));
     for (int i = 0; i < rows; i++) {
         matrix[i] = (int*)malloc(cols * sizeof(int));
@@ -86,6 +89,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    // read data to matrix
     printf("reading data to a matrix\n");
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
@@ -116,7 +120,7 @@ int main(int argc, char* argv[]) {
 
     for (int i = 0; i < num_threads; i++) {
         pthread_join(threads[i], NULL);
-        // compute column sums
+        // combine column sums
         for (int j = 0; j < cols; j++) {
             col_sums[j] += thread_data[i].local_col_sums[j];
         }
@@ -126,6 +130,12 @@ int main(int argc, char* argv[]) {
     printf("Total Sum: %lld\n", total_sum);
     printf("Min Element: %d\n", min_element);
     printf("Max Element: %d\n", max_element);
+
+    double time_taken = (double)(end - start) / CLOCKS_PER_SEC;
+    printf("Threads execution time: %.2f seconds\n", time_taken);
+
+    // Uncomment the following code to print row sums and column sums //
+
 /*
     // print row sums
     printf("Row Sums: ");
@@ -140,11 +150,9 @@ int main(int argc, char* argv[]) {
     }
     printf("\n");
 */
-    double time_taken = (double)(end - start) / CLOCKS_PER_SEC;
-    printf("Threads execution time: %.2f seconds\n", time_taken);
+    
 
-
-
+    // free memory
     free(row_sums);
     free(col_sums);
     for (int i = 0; i < rows; i++) {
